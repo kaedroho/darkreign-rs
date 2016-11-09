@@ -1,6 +1,6 @@
 extern crate byteorder;
 extern crate image;
 
-pub mod ftg;
+pub mod pack;
 pub mod palette;
 pub mod sprite;

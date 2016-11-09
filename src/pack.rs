@@ -2,22 +2,22 @@ use std::io::{Cursor, Seek, SeekFrom};
 use byteorder::{LittleEndian, ReadBytesExt};
 
 
-pub struct FTGArchive {
+pub struct PackFile {
     index_offset: u32,
     file_count: u32,
     data: Box<[u8]>,
 }
 
 
-impl FTGArchive {
-    pub fn new(data: Box<[u8]>) -> Result<FTGArchive, String> {
+impl PackFile {
+    pub fn new(data: Box<[u8]>) -> Result<PackFile, String> {
         let (index_offset, file_count) = {
             let mut cursor = Cursor::new(&data);
 
             // Check magic number
             let magic_number = cursor.read_u32::<LittleEndian>().unwrap();
             if magic_number != 0x47544f42 {
-                return Err("Not an FTG file (invalid magic number)".into());
+                return Err("Not a valid pack file (invalid magic number)".into());
             }
 
             // Index offset and file count
@@ -27,18 +27,18 @@ impl FTGArchive {
             (index_offset, file_count)
         };
 
-        Ok(FTGArchive {
+        Ok(PackFile {
             data: data,
             index_offset: index_offset,
             file_count: file_count,
         })
     }
 
-    pub fn iter_entries<'a>(&'a self) -> FTGArchiveEntriesIterator<'a> {
+    pub fn iter_entries<'a>(&'a self) -> PackFileEntriesIterator<'a> {
         let mut cursor = Cursor::new(&self.data);
         cursor.set_position(self.index_offset as u64);
 
-        FTGArchiveEntriesIterator {
+        PackFileEntriesIterator {
             archive: self,
             cursor: cursor,
             files_remaining: self.file_count,
@@ -47,13 +47,13 @@ impl FTGArchive {
 }
 
 
-pub struct FTGArchiveEntry<'a> {
+pub struct PackFileEntry<'a> {
     name: &'a [u8],
     data: &'a [u8],
 }
 
 
-impl<'a> FTGArchiveEntry<'a> {
+impl<'a> PackFileEntry<'a> {
     pub fn name(&self) -> &'a [u8] {
         self.name
     }
@@ -64,17 +64,17 @@ impl<'a> FTGArchiveEntry<'a> {
 }
 
 
-pub struct FTGArchiveEntriesIterator<'a> {
-    archive: &'a FTGArchive,
+pub struct PackFileEntriesIterator<'a> {
+    archive: &'a PackFile,
     cursor: Cursor<&'a Box<[u8]>>,
     files_remaining: u32,
 }
 
 
-impl<'a> Iterator for FTGArchiveEntriesIterator<'a> {
-    type Item = FTGArchiveEntry<'a>;
+impl<'a> Iterator for PackFileEntriesIterator<'a> {
+    type Item = PackFileEntry<'a>;
 
-    fn next(&mut self) -> Option<FTGArchiveEntry<'a>> {
+    fn next(&mut self) -> Option<PackFileEntry<'a>> {
         if self.files_remaining > 0 {
             self.files_remaining -= 1;
 
@@ -95,7 +95,7 @@ impl<'a> Iterator for FTGArchiveEntriesIterator<'a> {
             let data_start = self.cursor.read_u32::<LittleEndian>().unwrap() as usize;
             let data_end = data_start + self.cursor.read_u32::<LittleEndian>().unwrap() as usize;
 
-            Some(FTGArchiveEntry {
+            Some(PackFileEntry {
                 name: &self.archive.data[name_start..name_end],
                 data: &self.archive.data[data_start..data_end],
             })
