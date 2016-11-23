@@ -12,9 +12,17 @@ pub enum TeamColour {
 
 #[derive(Debug)]
 pub enum Faction {
+    Civilian,
     FreedomGuard,
     Imperium,
     Togran,
+}
+
+
+impl Default for Faction {
+    fn default() -> Faction {
+        Faction::Civilian
+    }
 }
 
 
