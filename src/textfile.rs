@@ -1,25 +1,28 @@
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Token {
-    Whitespace,
-    Comment,
     Word(String),
-    OpenCurlyBracket,
-    CloseCurlyBracket,
-    OpenRoundBracket,
-    CloseRoundBracket,
+    CurlyBlock(Vec<Token>),
+    RoundBlock(Vec<Token>),
 }
 
 
-pub fn lex(data: &[u8]) -> Result<Vec<Token>, String> {
-    let mut byte_iter = data.iter();
-    let mut last_token = Token::Whitespace;
+#[derive(Debug, PartialEq)]
+enum BlockType {
+    Module,
+    CurlyBlock,
+    RoundBlock,
+}
+
+
+fn lex_block(block_type: BlockType, byte_iter: &mut ::std::slice::Iter<u8>) -> Result<Vec<Token>, String> {
     let mut tokens = Vec::new();
+    let mut word = String::new();
+    let mut in_comment = false;
 
     while let Some(byte) = byte_iter.next() {
-        if last_token == Token::Comment {
+        if in_comment {
             if *byte == b'\n' {
-                tokens.push(last_token);
-                last_token = Token::Whitespace;
+                in_comment = false;
             }
 
             continue;
@@ -27,59 +30,83 @@ pub fn lex(data: &[u8]) -> Result<Vec<Token>, String> {
 
         match *byte {
             b';' => {
-                tokens.push(last_token);
-                last_token = Token::Comment;
-            }
-
-            b'\n' | b'\r' => {
-                if last_token == Token::Comment {
-                    tokens.push(last_token);
-                    last_token = Token::Whitespace;
+                if !word.is_empty() {
+                    tokens.push(Token::Word(word.clone()));
+                    word.clear()
                 }
+
+                in_comment = true;
             }
 
-            b' ' | b'\t' => {
-                if last_token != Token::Whitespace {
-                    tokens.push(last_token);
-                    last_token = Token::Whitespace;
+            b'\n' | b'\r' | b' ' | b'\t' => {
+                if !word.is_empty() {
+                    tokens.push(Token::Word(word.clone()));
+                    word.clear()
                 }
             }
 
             b'{' => {
-                tokens.push(last_token);
-                last_token = Token::OpenCurlyBracket;
+                if !word.is_empty() {
+                    tokens.push(Token::Word(word.clone()));
+                    word.clear()
+                };
+
+                tokens.push(Token::CurlyBlock(try!(lex_block(BlockType::CurlyBlock, byte_iter))));
             }
 
             b'}' => {
-                tokens.push(last_token);
-                last_token = Token::CloseCurlyBracket;
+                if !word.is_empty() {
+                    tokens.push(Token::Word(word.clone()));
+                    word.clear()
+                };
+
+                if block_type == BlockType::CurlyBlock {
+                    return Ok(tokens);
+                } else {
+                    return Err("Unexpected  char: '}'".to_string());
                 }
+            }
 
             b'(' => {
-                tokens.push(last_token);
-                last_token = Token::OpenRoundBracket;
-             }
+                if !word.is_empty() {
+                    tokens.push(Token::Word(word.clone()));
+                    word.clear()
+                };
+
+                tokens.push(Token::RoundBlock(try!(lex_block(BlockType::RoundBlock, byte_iter))));
+            }
 
             b')' => {
-                tokens.push(last_token);
-                last_token = Token::CloseRoundBracket;
+                if !word.is_empty() {
+                    tokens.push(Token::Word(word.clone()));
+                    word.clear()
+                };
+
+                if block_type == BlockType::RoundBlock {
+                    return Ok(tokens);
+                } else {
+                    return Err("Unexpected  char: ')'".to_string());
+                }
             }
 
             _ => {
                 let c = *byte as char;
-
-                if let Token::Word(mut string) = last_token {
-                    string.push(c);
-                    last_token = Token::Word(string);
-                } else {
-                    tokens.push(last_token);
-                    last_token = Token::Word(c.to_string());
-                }
+                word.push(c);
             }
         }
     }
 
-    tokens.push(last_token);
+    if !word.is_empty() {
+        tokens.push(Token::Word(word.clone()));
+        word.clear()
+    };
 
     Ok(tokens)
+}
+
+
+pub fn lex(data: &[u8]) -> Result<Vec<Token>, String> {
+    let mut byte_iter = data.iter();
+
+    lex_block(BlockType::Module, &mut byte_iter)
 }
