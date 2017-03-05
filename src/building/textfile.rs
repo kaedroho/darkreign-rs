@@ -1,4 +1,6 @@
 use textfile::{BlockDelimiter, Token, lex};
+use team::Faction;
+
 use building::BuildingType;
 
 
@@ -94,10 +96,24 @@ fn walk_type_definition<I: Iterator<Item=Token>>(tokens_iter: &mut I) -> Result<
                                 println!("NEED RESOURCE {:?}", walk_parameter_list(&mut tokens_iter));
                             }
                             "SetSide" => {
-                                println!("SIDE {:?}", walk_parameter_list(&mut tokens_iter));
+                                let mut params = try!(walk_parameter_list(&mut tokens_iter));
+
+                                if params.len() != 1 {
+                                    return Err(format!("SetSide expects 1 parameter. got {}", params.len()));
+                                }
+
+                                let faction = match params.pop().unwrap().as_ref() {
+                                    "0" => Faction::FreedomGuard,
+                                    "1" => Faction::Imperium,
+                                    "2" => Faction::Civilian,
+                                    "3" => Faction::Togran,
+                                    _ => return Err("unexpected token".to_string()),
+                                };
+
+                                building_type.set_faction(faction);
                             }
                             "SetBay" => {
-                                println!("SIDE {:?}", walk_parameter_list(&mut tokens_iter));
+                                println!("BAY {:?}", walk_parameter_list(&mut tokens_iter));
                             }
                             "SetRepairCost" => {
                                 println!("REPAIR COST {:?}", walk_parameter_list(&mut tokens_iter));
