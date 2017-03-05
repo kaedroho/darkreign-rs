@@ -41,7 +41,17 @@ fn walk_type_definition<I: Iterator<Item=Token>>(tokens_iter: &mut I) -> Result<
                     Token::Word(word) => {
                         match word.as_ref() {
                             "SetBuildingImages" => {
-                                println!("IMAGES {:?}", walk_parameter_list(&mut tokens_iter));
+                                let mut params = try!(walk_parameter_list(&mut tokens_iter));
+
+                                if params.len() != 3 {
+                                    return Err(format!("SetBuildingImages expects 3 parameters. got {}", params.len()));
+                                }
+
+                                let menu = params.pop().unwrap();
+                                let top = params.pop().unwrap();
+                                let base = params.pop().unwrap();
+
+                                building_type.set_images(base, top, menu);
                             }
                             "SetDescription" => {
                                 println!("DESCRIPTION {:?}", walk_parameter_list(&mut tokens_iter));
