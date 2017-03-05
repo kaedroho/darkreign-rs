@@ -1,10 +1,10 @@
-use textfile::{Token, lex};
+use textfile::{BlockDelimiter, Token, lex};
 use building::BuildingType;
 
 
 fn walk_parameter_list<I: Iterator<Item=Token>>(tokens_iter: &mut I) -> Result<Vec<String>, String> {
     match tokens_iter.next() {
-        Some(Token::RoundBlock(tokens)) => {
+        Some(Token::Block(BlockDelimiter::Parentheses, tokens)) => {
             let mut parameter_list = Vec::new();
             for word_token in tokens {
                 match word_token {
@@ -31,7 +31,7 @@ fn walk_type_definition<I: Iterator<Item=Token>>(tokens_iter: &mut I) -> Result<
     let mut building_type = BuildingType::new(parameter_list.pop().unwrap());
 
     match tokens_iter.next() {
-        Some(Token::CurlyBlock(tokens)) => {
+        Some(Token::Block(BlockDelimiter::Brace, tokens)) => {
             let mut tokens_iter = tokens.iter().cloned();
 
             while let Some(token) = tokens_iter.next() {
@@ -46,7 +46,7 @@ fn walk_type_definition<I: Iterator<Item=Token>>(tokens_iter: &mut I) -> Result<
                             }
                             "SetRequirements" => {
                                 match tokens_iter.next() {
-                                    Some(Token::CurlyBlock(tokens)) => {
+                                    Some(Token::Block(BlockDelimiter::Brace, tokens)) => {
                                         let mut tokens_iter = tokens.iter().cloned();
                                         while let Some(word_token) = tokens_iter.next() {
                                             match word_token {
@@ -80,7 +80,7 @@ fn walk_type_definition<I: Iterator<Item=Token>>(tokens_iter: &mut I) -> Result<
                             }
                             "SetEfficiencyResource" => {
                                 match tokens_iter.next() {
-                                    Some(Token::CurlyBlock(tokens)) => {
+                                    Some(Token::Block(BlockDelimiter::Brace, tokens)) => {
                                         // TODO
                                     }
                                     Some(_) => return Err("unexpected token".to_string()),

@@ -1,20 +1,18 @@
 #[derive(Debug, PartialEq, Clone)]
+pub enum BlockDelimiter {
+    Brace,
+    Parentheses,
+}
+
+
+#[derive(Debug, PartialEq, Clone)]
 pub enum Token {
     Word(String),
-    CurlyBlock(Vec<Token>),
-    RoundBlock(Vec<Token>),
+    Block(BlockDelimiter, Vec<Token>),
 }
 
 
-#[derive(Debug, PartialEq)]
-enum BlockType {
-    Module,
-    CurlyBlock,
-    RoundBlock,
-}
-
-
-fn lex_block(block_type: BlockType, byte_iter: &mut ::std::slice::Iter<u8>) -> Result<Vec<Token>, String> {
+fn lex_block(delimiter: Option<BlockDelimiter>, byte_iter: &mut ::std::slice::Iter<u8>) -> Result<Vec<Token>, String> {
     let mut tokens = Vec::new();
     let mut word = String::new();
     let mut in_comment = false;
@@ -51,7 +49,7 @@ fn lex_block(block_type: BlockType, byte_iter: &mut ::std::slice::Iter<u8>) -> R
                     word.clear()
                 };
 
-                tokens.push(Token::CurlyBlock(try!(lex_block(BlockType::CurlyBlock, byte_iter))));
+                tokens.push(Token::Block(BlockDelimiter::Brace, try!(lex_block(Some(BlockDelimiter::Brace), byte_iter))));
             }
 
             b'}' => {
@@ -60,7 +58,7 @@ fn lex_block(block_type: BlockType, byte_iter: &mut ::std::slice::Iter<u8>) -> R
                     word.clear()
                 };
 
-                if block_type == BlockType::CurlyBlock {
+                if delimiter == Some(BlockDelimiter::Brace) {
                     return Ok(tokens);
                 } else {
                     return Err("Unexpected  char: '}'".to_string());
@@ -73,7 +71,7 @@ fn lex_block(block_type: BlockType, byte_iter: &mut ::std::slice::Iter<u8>) -> R
                     word.clear()
                 };
 
-                tokens.push(Token::RoundBlock(try!(lex_block(BlockType::RoundBlock, byte_iter))));
+                tokens.push(Token::Block(BlockDelimiter::Parentheses, try!(lex_block(Some(BlockDelimiter::Parentheses), byte_iter))));
             }
 
             b')' => {
@@ -82,7 +80,7 @@ fn lex_block(block_type: BlockType, byte_iter: &mut ::std::slice::Iter<u8>) -> R
                     word.clear()
                 };
 
-                if block_type == BlockType::RoundBlock {
+                if delimiter == Some(BlockDelimiter::Parentheses) {
                     return Ok(tokens);
                 } else {
                     return Err("Unexpected  char: ')'".to_string());
@@ -108,5 +106,5 @@ fn lex_block(block_type: BlockType, byte_iter: &mut ::std::slice::Iter<u8>) -> R
 pub fn lex(data: &[u8]) -> Result<Vec<Token>, String> {
     let mut byte_iter = data.iter();
 
-    lex_block(BlockType::Module, &mut byte_iter)
+    lex_block(None, &mut byte_iter)
 }
