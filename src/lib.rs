@@ -5,6 +5,7 @@ pub mod textfile;
 pub mod pack;
 pub mod palette;
 pub mod sprite;
+pub mod tileset;
 pub mod map;
 pub mod team;
 pub mod building;
