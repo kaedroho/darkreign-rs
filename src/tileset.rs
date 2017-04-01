@@ -4,13 +4,13 @@ use byteorder::{LittleEndian, ReadBytesExt};
 
 
 pub struct Tile {
-    data: [u8; 24 * 24],
+    pub data: [u8; 24 * 24],
 }
 
 
 pub struct TileSet {
-    palette: &'static [u8],
-    tiles: Vec<Tile>,
+    pub palette: &'static [u8],
+    pub tiles: Vec<Tile>,
 }
 
 
