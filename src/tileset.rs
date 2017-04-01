@@ -1,137 +1,82 @@
-use std::io::{Cursor, Read, Write};
+use std::io::{Cursor, Read, Seek, SeekFrom, Error};
 
 use byteorder::{LittleEndian, ReadBytesExt};
-use image::ColorType;
-use image::png::PNGEncoder;
-
-use palette::SNOW_PALETTE;
 
 
-pub struct TileSetFile {
-    data: Box<[u8]>,
+pub struct Tile {
+    data: [u8; 24 * 24],
 }
 
 
-impl TileSetFile {
-    pub fn open(data: Box<[u8]>) -> TileSetFile {
-        {
-            let mut cursor = Cursor::new(&data);
+pub struct TileSet {
+    palette: &'static [u8],
+    tiles: Vec<Tile>,
+}
 
-            // Check magic number
-            let mut magic_number: [u8; 4] = [0; 4];
-            cursor.read_exact(&mut magic_number).unwrap();
 
-            if &magic_number != b"TILE" {
-                panic!("unrecognised magic number!");
-            }
+impl TileSet {
+    pub fn read(data: Box<[u8]>, palette: &'static [u8]) -> Result<TileSet, Error> {
+        let mut tiles = Vec::with_capacity(8 * 16 + 8 * 8 + 16 * 4);
+        let mut cursor = Cursor::new(&data);
 
-            // Check version
-            let version = cursor.read_u32::<LittleEndian>().unwrap();
-            if version != 0x240 {
-                panic!("unsupported version!");
-            }
+        // Check magic number
+        let mut magic_number: [u8; 4] = [0; 4];
+        cursor.read_exact(&mut magic_number)?;
+
+        if &magic_number != b"TILE" {
+            panic!("unrecognised magic number!");
         }
 
-        TileSetFile {
-            data: data,
+        // Check version
+        let version = cursor.read_u32::<LittleEndian>()?;
+        if version != 0x240 {
+            panic!("unsupported version!");
         }
-    }
-
-    pub fn write_png<W: Write>(&self, w: W) {
-        let out_size_x = 24 as usize;
-        let out_size_y = self.data.len() / out_size_x;
-        let mut pixel_data = vec![0; out_size_x * (out_size_y + 1) * 4];
-
-        let mut cursor = Cursor::new(&self.data);
-        cursor.set_position(8);
-
-        let mut bytes = cursor.bytes();
 
         // Basic tilesets
-        for tileset in 0..16 {
-            for tile in 0..8 {
-                let _ = bytes.next().unwrap().unwrap();
-                let sy = (tileset * 8 + tile) * 24;
+        for _ts in 0..16 {
+            for _tile in 0..8 {
+                // Skip 1 byte
+                // TODO: Find out why there's an extra byte here
+                cursor.seek(SeekFrom::Current(1))?;
 
-                for l in 0..24 {
-                    for r in 0..24 {
-                        let v = bytes.next().unwrap().unwrap();
-                        let px = (sy + l) * 24 + r;
-                        pixel_data[px * 4 + 0] = SNOW_PALETTE[v as usize * 4 + 0];
-                        pixel_data[px * 4 + 1] = SNOW_PALETTE[v as usize * 4 + 1];
-                        pixel_data[px * 4 + 2] = SNOW_PALETTE[v as usize * 4 + 2];
-                        pixel_data[px * 4 + 3] = 255;
-                    }
-                }
+                let mut data: [u8; 24 * 24] = [0; 24 * 24];
+                cursor.read_exact(&mut data)?;
+                tiles.push(Tile {
+                    data: data,
+                });
             }
         }
 
         // Water animation
-        for tileset in 0..8 {
-            for tile in 0..8 {
-                let sy = ((16 + tileset) * 8 + tile) * 24;
-
-                for l in 0..24 {
-                    for r in 0..24 {
-                        let v = bytes.next().unwrap().unwrap();
-                        let px = (sy + l) * 24 + r;
-                        pixel_data[px * 4 + 0] = SNOW_PALETTE[v as usize * 4 + 0];
-                        pixel_data[px * 4 + 1] = SNOW_PALETTE[v as usize * 4 + 1];
-                        pixel_data[px * 4 + 2] = SNOW_PALETTE[v as usize * 4 + 2];
-                        pixel_data[px * 4 + 3] = 255;
-                    }
-                }
+        for _ts in 0..8 {
+            for _tile in 0..8 {
+                let mut data: [u8; 24 * 24] = [0; 24 * 24];
+                cursor.read_exact(&mut data)?;
+                tiles.push(Tile {
+                    data: data,
+                });
             }
         }
 
         // Land-sea blending tiles
-        for tileset in 0..4 {
-            for tile in 0..16 {
-                let _ = bytes.next().unwrap().unwrap();
-                let sy = ((tileset) * 17 + 24 * 8 + 5 + tile) * 24;
+        for _ts in 0..4 {
+            for _tile in 0..16 {
+                // Skip 1 byte
+                // TODO: Find out why there's an extra byte here
+                cursor.seek(SeekFrom::Current(1))?;
 
-                for l in 0..24 {
-                    for r in 0..24 {
-                        let v = bytes.next().unwrap().unwrap();
-                        let px = (sy + l) * 24 + r;
-                        pixel_data[px * 4 + 0] = SNOW_PALETTE[v as usize * 4 + 0];
-                        pixel_data[px * 4 + 1] = SNOW_PALETTE[v as usize * 4 + 1];
-                        pixel_data[px * 4 + 2] = SNOW_PALETTE[v as usize * 4 + 2];
-                        pixel_data[px * 4 + 3] = 255;
-                    }
-                }
+                let mut data: [u8; 24 * 24] = [0; 24 * 24];
+                cursor.read_exact(&mut data)?;
+                tiles.push(Tile {
+                    data: data,
+                });
             }
         }
 
-        // TODO masks
-
-
-/*
-        let mut px = 0;
-        let mut skip = 0;
-
-
-        for b in cursor.bytes() {
-            let v = b.unwrap();
-            if skip > 0 {
-                skip -= 1;
-                continue;
-            }
-            pixel_data[px * 4 + 0] = SNOW_PALETTE[v as usize * 4 + 0];
-            pixel_data[px * 4 + 1] = SNOW_PALETTE[v as usize * 4 + 1];
-            pixel_data[px * 4 + 2] = SNOW_PALETTE[v as usize * 4 + 2];
-            pixel_data[px * 4 + 3] = 255;
-
-            if px % (24 * 24) == 0 {
-                skip = 1;
-            }
-
-            px += 1;
-        }
-*/
-
-        // Encode
-        let mut encoder = PNGEncoder::new(w);
-        encoder.encode(&pixel_data, out_size_x as u32, out_size_y as u32, ColorType::RGBA(8));
+        Ok(TileSet {
+            palette: palette,
+            tiles: tiles,
+        })
     }
 }
