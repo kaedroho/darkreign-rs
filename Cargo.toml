@@ -7,3 +7,4 @@ authors = ["Karl Hobley <karlhobley10@gmail.com>"]
 byteorder = "*"
 image = "*"
 piston_window = "0.61.0"
+clap = "*"
